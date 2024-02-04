@@ -1,0 +1,119 @@
+# This is a copy of the IBM Data Science Project comparing GameStop and Tesla Stock performance over Revenue
+# this was modified from the original code by G.C. Santiago of IBM
+# by Tobias Boehm, February 2, 2024
+
+# This installs the necessary libraries
+
+!pip install yfinance==0.1.67
+!mamba install bs4==4.10.0 -y
+!pip install nbformat==4.2.0
+!pip install html5lib #added this to avoid parser error in BeautifulSoup
+
+# loads needed libraries
+
+import yfinance as yf
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import warnings
+# Ignore all warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+# defines Santiago's graphing function
+
+def make_graph(stock_data, revenue_data, stock):
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=("Historical Share Price", "Historical Revenue"), vertical_spacing = .3)
+    stock_data_specific = stock_data[stock_data.Date <= '2021--06-14']
+    revenue_data_specific = revenue_data[revenue_data.Date <= '2021-04-30']
+    fig.add_trace(go.Scatter(x=pd.to_datetime(stock_data_specific.Date, infer_datetime_format=True), y=stock_data_specific.Close.astype("float"), name="Share Price"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=pd.to_datetime(revenue_data_specific.Date, infer_datetime_format=True), y=revenue_data_specific.Revenue.astype("float"), name="Revenue"), row=2, col=1)
+    fig.update_xaxes(title_text="Date", row=1, col=1)
+    fig.update_xaxes(title_text="Date", row=2, col=1)
+    fig.update_yaxes(title_text="Price ($US)", row=1, col=1)
+    fig.update_yaxes(title_text="Revenue ($US Millions)", row=2, col=1)
+    fig.update_layout(showlegend=False,
+    height=900,
+    title=stock,
+    xaxis_rangeslider_visible=True)
+    fig.show()
+
+# Question 1
+
+tesla = yf.Ticker("TSLA") # Load Tesla financials from Yahoo
+tesla_data = tesla.history(period="max") # gets entire history of stock data
+esla_data.reset_index(inplace=True) # rest index inplace
+tesla_data.head() # display first 5
+
+# Question 2
+
+url = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-PY0220EN-SkillsNetwork/labs/project/revenue.htm"
+html_data = requests.get(url).text # loads Tesla financials page
+tesla_soup = BeautifulSoup(html_data, 'html5lib') # Parse with beautiful soup
+
+  # get 2nd table with quarterly data
+
+tesla_revenue = pd.DataFrame(columns=["Date", "Revenue"])
+
+for row in tesla_soup.find_all("tbody")[1].find_all('tr'): #first tbody tag is the table I want with annual revenue
+    col = row.find_all("td")
+    date = col[0].text # read Date
+    revenue = col[1].text # read Revenue
+    
+    tesla_revenue = tesla_revenue.append({"Date": date, "Revenue": revenue},ignore_index=True)
+
+tesla_revenue["Revenue"] = tesla_revenue['Revenue'].str.replace(',|\$',"") # remove comma and dollar signs
+
+tesla_revenue.dropna(inplace=True) # remove empty cells
+
+tesla_revenue = tesla_revenue[tesla_revenue['Revenue'] != ""] # remove empty strings
+
+tesla_revenue.tail() # display first 5 earning calls
+
+# Question 3
+
+  # This gets the GameStop Stock data the same way as was done in Question 1 for Tesla
+
+GameStop = yf.Ticker("GME")
+
+gme_data = GameStop.history(period="max")
+
+gme_data.reset_index(inplace=True)
+gme_data.head()
+
+# Question 4
+
+  # This scrapes the quarterly revenue data for GameStop from the website the same way as was done in Question 2 for Tesla
+
+url = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-PY0220EN-SkillsNetwork/labs/project/stock.html"
+html_data = requests.get(url).text
+
+gme_soup = BeautifulSoup(html_data, 'html5lib')
+
+# The website is set up like the Tesla website, with the revenue in the first table encountered
+gme_revenue = pd.DataFrame(columns=["Date", "Revenue"])
+for row in gme_soup.find_all("tbody")[1].find_all('tr'): #first tbody tag is the table I want with annual revenue
+    col = row.find_all("td")
+    date = col[0].text # read Date
+    revenue = col[1].text # read Revenue
+    
+    gme_revenue = gme_revenue.append({"Date": date, "Revenue": revenue}, ignore_index=True)
+
+gme_revenue["Revenue"] = gme_revenue['Revenue'].str.replace(',|\$',"")
+gme_revenue.dropna(inplace=True)
+gme_revenue = gme_revenue[gme_revenue['Revenue'] != ""]
+gme_revenue.tail()
+
+# Question 5
+
+  # display the graph for Tesla stock price and earning history
+
+make_graph(tesla_data, tesla_revenue, 'Tesla')
+
+# Question 6
+
+  # display the graph for GameStop stock price and earning history
+
+make_graph(gme_data, gme_revenue, 'GameStop')
+
